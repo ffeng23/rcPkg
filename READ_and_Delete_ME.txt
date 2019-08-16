@@ -1,0 +1,92 @@
+* Edit the help file skeletons in 'man', possibly combining help files for multiple
+  functions.
+* Edit the exports in 'NAMESPACE', and add necessary imports.
+* Put any C/C++/Fortran code in 'src'.
+* If you have compiled code, add a useDynLib() directive to 'NAMESPACE'.
+* Run R CMD build to build the package tarball.
+* Run R CMD check to check the package tarball.
+
+Read "Writing R Extensions" for more information.
+
+
+#code to run R package
+#namespace to import export
+#example for each methods
+#
+library(usethis)
+library(devtools)
+library(roxygen2)
+
+#run this on every startup of the R console
+holderPath<-"E:\\feng\\LAB\\hg\\Rccpp"
+setwd( "E:\\feng\\LAB\\hg\\Rccpp")
+##same thing create				 
+usethis::create_package("rcPkg", open=F )  #open=T will give us an error message, but the package will be created. don't understand.
+#this leaves us a bare miminal structure with only 3 things, "NAMESPACE", "DISCRIPTION", "R".
+#need to create "src" folder for c/c++.
+projectPath<-"E:\\feng\\LAB\\hg\\Rccpp\\rcPkg"
+setwd( "E:\\feng\\LAB\\hg\\Rccpp\\rcPkg")
+mkdir src;
+
+#=============================
+#then need to write c/c++ code and r wrapper code and modify NAMESPACE
+# 1)write c code. put the files into /src folder. 
+#	remember to add "#include <R.h> or #include <Rinternals.h>
+# 2)add R code wrapper files to /R folder. in this file it is important to #'@export and also add #@useDynLib rcPkg add_rc
+#	to explain, the rcPkg is the name of the dll that will/is compile from the c code. 
+#			the add_rc is the function name of c code for the wrapper to call.
+#		#'@export
+#               #'@useDynLib rcPkg add_rc
+#3) modify the NAMESPACE, with the following 
+
+#	export(add_r)
+#	useDynLib(rcPkg,add_rc)
+#	useDynLib: the first argument is the dll name (rcPkg.dll), and the second is the function name.
+#	It seems that we don't need to modify this NAMESPACE manually. roxygen2 (by calling devtools::document) will
+#	do this job.
+#  There is only one confusion. To call devtools::document(), we need to compile/build the c code dll first. Otherwise
+#	it will fail when loading the dll. A solution(?), run build/installation of library first, since the installation 
+#	will run compiling and loading the dll. (need to verify whether this is going to correct?? No!!! see below for explanation in document()) 
+#	another related issue is that how to modify the dll name. when the installation to call it, it usually by default calls it "packagename.dll". 
+#	we might want to modify it to have a different name???
+#  
+#call roxygen2 to process the helper pages from the roxygen comments
+
+#setwd("C:\\Feng\\LAB\\hg\\Rccpp")
+# It seems that devtools::document() needs to load the dynamic library dll of c code. 
+#	this means we need to manually compile the dll
+	#open the COMMAND LINE CONSOLE and then go to the /src folder
+	E:
+	cd E:\\feng\\LAB\\hg\\Rccpp\\rcPkg\\src
+	R CMD SHLIB cDemo.c -o rcPkg.dll
+   #one import thing is that we need to have the name of dll matched with the one in the R wrapper code.
+setwd( "E:\\feng\\LAB\\hg\\Rccpp\\rcPkg")
+devtools::document() #this will modify the NAMESPACE file
+
+#remove #<--------this is not necessary.
+remove.packages("rcPkg")
+#unload the dll in order to recompile the c code <--------now it seems this is not necessary.
+dyn.unload("E:\\feng\\LAB\\hg\\Rccpp\\rcPkg\\src\\rcPkg.dll")
+#-----it seems that if need to reinstall/recompile everything, we need to restart the console. otherwise will fail to reinstall, even if we remove the package.
+
+#feng's directory to call to install
+setwd( "E:\\feng\\LAB\\hg\\Rccpp")
+dyn.unload("C:/Users/ff23/Documents/R/win-library/3.5/rcPkg/libs/x64/rcPkg.dll")
+#install from local directory, but this is different from install.packages
+devtools::install("rcPkg")
+dyn.load("C:/Users/ff23/Documents/R/win-library/3.5/rcPkg/libs/x64/rcPkg.dll")
+library(rcPkg)
+
+#install from local using install.packages utility
+setwd( "E:\\feng\\LAB\\hg\\Rccpp\\")
+install.packages(c("rcPkg"),repos=NULL, type="source")
+
+#this following only necessary if we need to re-compile the dll 
+#we need to unload the dll and then compile/install and then manually load the dll to make it work.
+#folder path is specified by the compiler/installor (devtools:install("<name>")). 
+#Note:::: the backslash is important here, not the double forward slash.
+dyn.unload("C:/Users/ff23/Documents/R/win-library/3.5/rcPkg/libs/x64/rcPkg.dll")
+dyn.load("C:/Users/ff23/Documents/R/win-library/3.5/rcPkg/libs/x64/rcPkg.dll")
+
+#load the package
+library(rcPkg)
