@@ -58,9 +58,13 @@ mkdir src;
 	#open the COMMAND LINE CONSOLE and then go to the /src folder
 	E:
 	cd E:\\feng\\LAB\\hg\\Rccpp\\rcPkg\\src
+	#for windows 
 	R CMD SHLIB cDemo.c -o rcPkg.dll
+	#for linux
+	R CMD SHLIB cDemo.c -o rPkg.so 
    #one import thing is that we need to have the name of dll matched with the one in the R wrapper code.
-setwd( "E:\\feng\\LAB\\hg\\Rccpp\\rcPkg")
+setwd( "E:\\feng\\LAB\\hg\\Rccpp\\rcPkg") #for windows
+setwd("/home/feng/Feng/hg/rcPkg") #for linux
 devtools::document() #this will modify the NAMESPACE file
 
 #remove #<--------this is not necessary.
@@ -73,6 +77,7 @@ dyn.unload("E:\\feng\\LAB\\hg\\Rccpp\\rcPkg\\src\\rcPkg.dll")
 setwd( "E:\\feng\\LAB\\hg\\Rccpp")
 dyn.unload("C:/Users/ff23/Documents/R/win-library/3.5/rcPkg/libs/x64/rcPkg.dll")
 #install from local directory, but this is different from install.packages
+setwd("/home/feng/Feng/hg")
 devtools::install("rcPkg")
 dyn.load("C:/Users/ff23/Documents/R/win-library/3.5/rcPkg/libs/x64/rcPkg.dll")
 library(rcPkg)
