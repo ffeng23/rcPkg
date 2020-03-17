@@ -64,7 +64,7 @@ mkdir src;
 	R CMD SHLIB cDemo.c -o rPkg.so 
    #one import thing is that we need to have the name of dll matched with the one in the R wrapper code.
 setwd( "E:\\feng\\LAB\\hg\\Rccpp\\rcPkg") #for windows
-setwd("/home/feng/Feng/hg/rcPkg") #for linux
+#setwd("/home/feng/Feng/hg/rcPkg") #for linux
 devtools::document() #this will modify the NAMESPACE file
 
 #remove #<--------this is not necessary.
