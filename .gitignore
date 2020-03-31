@@ -1,0 +1,4 @@
+unittest/.depend
+*.o
+*.dll
+*.so
