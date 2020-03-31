@@ -5,7 +5,11 @@
 #
 add_r_w<-function(x,y)
 {
-	.C(add_rc, x, y, numeric(1))[[3]]
+#here in this example, we using .C call, of which C function normally does not return values.
+# and also pointer only as input. 
+#but instead we using the input pointer to function as output. Inputs are passed as 
+# list of pointers. so we get the output as the 3rd input.
+	.C(add_rc, x, y, numeric(1))[[3]];
 }
 #only apply to pakcages with name spaces.
 #.onUnload <- function (libpath) {
@@ -18,6 +22,31 @@ add_r_w<-function(x,y)
 add_rcall_w<-function(x,y)
 {
 	.Call(add_rc_call, x, y)
+}
+#'@export
+#'@useDynLib rcPkg accessVector_rc_call accessStrVec_rc_call
+accessVector_rc_w<-function(x)
+{
+	y<-NULL;
+	if((class(x)!="numeric"&&class(x)!="integer")&&length(x)!=0)
+	{
+		if(class(x)=="character")
+		{
+			y<-.Call(accessStrVec_rc_call,x)
+		}
+		else
+		{
+			stop("we need either a numeric or integer array as input");
+		}
+	} else {
+		if(class(x)=="integer")
+		{
+			x=as.numeric(x);
+		}
+		y<-.Call(accessVector_rc_call,x);
+	}
+	
+	return(y);
 }
 
 #'@title R wrapper of C function to get subset of indexes by full combination
@@ -53,5 +82,90 @@ getDiverseSet_w<-function(s,  index)
 {
 	#cat("dim",dim(s)[1]);
 	.Call(getDiverseSet_c, s, dim(s)[1], dim(s)[2],index, dim(index)[2], dim(index)[1]
+			);
+}
+
+#now define a wrapper to call intraDiversities
+#'@title R wrapper of c functions to do intraDiversities
+#'@description doing c code based on the input to calculate the intraDiversities of clones for each sample
+#'	it is too slow to do it in R
+#'@param clones dataframe the clone summary table . 
+#'	Data schema is [1]:sample name;[2]clone Id; [3]xMembers (number of clone members);
+#'@param clone.assignments data frame the clone assignment table 
+#'	Data schema: [1]sample name;[2] clone Id; [3] read ID
+#'@param mutations data frame the mutation table 
+#'	Data schema: [1] ReadID; [2] type ; [3] positions
+#'@param Ig.RecSums data frame the Ig recombination table 
+#'	Data schema: [1] ReadID; [2] xVBase
+#'@param vlengths data frame the vlengths table
+#'	Data schema: [1] ReadID; [2] totalVBase 
+#'@param indel.penalty numeric the indel penalty score. The default is 1. 
+#'@return a data frame contains "sampleID" and "cloneID" and "idi" and "xMembers" (number of clone)
+#'	
+#'@export
+#'@useDynLib rcPkg intraClonalDiversities_c
+
+intraClonalDiversities<-function(
+			clones, #clone summary, 
+			clone.assigns, #clone assignments for sequences
+			mutations, #seq muations VRG
+			Ig.RecSums, #Ig Recsum for VBases
+			vlengths,  #total lengths of v 
+			indel.penalty=1 #for penalty of indel.
+)
+{
+	#//check to make sure the data integrity
+		if(missing(clones)||class(clones)!="data.frame"||dim(clones)[2]<3)
+		{
+			stop("clone data input is not valid, please check..... \n");
+		}
+		if(missing(clone.assigns)||class(clone.assigns)!="data.frame"||dim(clone.assigns)[2]<3)
+		{
+			stop("clone assign data input is not valid, please check..... \n");
+		}
+		if(missing(mutations)||class(mutations)!="data.frame"||dim(mutations)[2]<3)
+		{
+			stop("mutation data input is not valid, please check..... \n");
+		}
+		if(missing(Ig.RecSums)||class(Ig.RecSums)!="data.frame"||dim(Ig.RecSums)[2]<2)
+		{
+			stop("Ig recombination data input is not valid, please check..... \n");
+		}
+		if(missing(vlengths)||class(vlengths)!="data.frame"||dim(vlengths)[2]<2)
+		{
+			stop("v length data input is not valid, please check..... \n");
+		}
+		
+		clones_sampleNames=as.character(clones[,1]) #clone summary, sample name, string char** 
+		
+		clones_cloneID=as.integer(clones[,2]) #clone summary, clones ids, int *
+		clones_xMembers=as.integer(clones[,3])# //clone summary, number of members, int *
+			
+		cloneAssigns_sampleNames=as.character(clone.assigns[,1]);# //clone assignments for sequences, sample names, char**
+		cloneAssigns_cloneID=as.integer(clone.assigns[,2])# //clone assignments, clone Ids, int*
+		cloneAssigns_ReadID=as.character(clone.assigns[,3])# //clone assignment, read ID, char**
+			
+		#now in mutations table we don't include the sampleNames, since READID is good to identify
+		mutations_ReadID=as.character(mutations[,1])#, //seq muations VRG, read ID, char** 
+		mutations_Type=as.character(mutations[,2])#   //   Type , string substitution, char**
+		mutations_Position=as.integer(mutations[,3])#  //Poisiotin, int* 
+			
+		#	//now in Ig_RecSums table we don't include the sampleNames, since READID (UID) is good to identify
+		Ig_RecSums_UID=as.character(Ig.RecSums[,1])# //Ig Recsum for VBases, UID, string, char**  
+		Ig_RecSums_XVBase=as.integer(Ig.RecSums[,2])#, //             XVBase, int* 
+			
+		#	//now in vlengths table we don't include the sampleNames, since READID is good to identify
+		vlengths_ReadID=as.character(vlengths[,1])#,  //total lengths of v, ReadID, char**  
+		vlengths_totalVBase=as.integer(vlengths[,2]);# //         int*, totalVBase
+			
+		
+	.Call(
+		intraClonalDiversities_c, 
+					clones_sampleNames, clones_cloneID, clones_xMembers,
+					cloneAssigns_sampleNames, cloneAssigns_cloneID, cloneAssigns_ReadID, 
+					mutations_ReadID, mutations_Type, mutations_Position, 
+					Ig_RecSums_UID, Ig_RecSums_XVBase, 
+					vlengths_ReadID, vlengths_totalVBase,
+					indel.penalty
 			);
 }

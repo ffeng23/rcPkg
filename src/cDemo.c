@@ -7,6 +7,7 @@
 #include <Rinternals.h>
 #include <stdlib.h>
 #include <stdbool.h>
+#include <stdio.h>
 
 //used to be called by .C() 
 void add_rc(double* x, double* y, double* o)
@@ -16,25 +17,126 @@ void add_rc(double* x, double* y, double* o)
 	
 }
 
-//used to be called by .C() 
+//used to be called by .Call() 
 SEXP add_rc_call(SEXP x, SEXP y)
 {
 	Rprintf("feng *call2222* in side c function\n");
 	//start converting the inputs
 	double xc=asReal(x); double yc=asReal(y);
-	
 	//for output
 	double o=xc+yc;
 	
-	return ScalarReal(o);
+	//adding 
+	Rprintf("****new adding vector\n");
+	
+	SEXP xv=PROTECT(allocVector(INTSXP, 3));
+	INTEGER(xv)[0]=10;
+	INTEGER(xv)[1]=20;
+	INTEGER(xv)[2]=30;
+	//SET_VECTOR_ELT(xv, 0, scalarInteger(10));
+	//SET_VECTOR_ELT(Xv, 1,20);
+	SEXP xs=PROTECT(allocVector(STRSXP, 3));
+	SET_STRING_ELT(xs, 0, mkChar("Feng"));
+	SET_STRING_ELT(xs, 1, mkChar("Zihan"));
+	SET_STRING_ELT(xs, 2, mkChar("Chris"));
+	
+	SEXP out =PROTECT(allocVector(VECSXP,2));
+	SET_VECTOR_ELT(out, 0,xv);
+	SET_VECTOR_ELT(out, 1,xs);
+	SEXP cls, nam, rownam;
+	PROTECT(cls = allocVector(STRSXP, 1)); // class attribute
+   SET_STRING_ELT(cls, 0, mkChar("data.frame"));
+   classgets(out, cls);
+   
+   PROTECT(nam = allocVector(STRSXP, 2)); // names attribute (column names)
+   SET_STRING_ELT(nam, 0, mkChar("a"));
+   SET_STRING_ELT(nam, 1, mkChar("b"));
+   namesgets(out, nam);
+   
+   char* s=(char*) R_alloc(10, sizeof(char));
+   
+   PROTECT(rownam = allocVector(STRSXP, 3)); // row.names attribute
+   s[0]='1';
+   s[1]='\0';
+   sprintf(s, "%d", 1);
+   SET_STRING_ELT(rownam, 0, mkChar(s));
+   s[0]='2';
+   SET_STRING_ELT(rownam, 1, mkChar(s));
+   s[0]='3';
+   //itoa(1, s, 10);
+   SET_STRING_ELT(rownam, 2, mkChar(s));
+   setAttrib(out, R_RowNamesSymbol, rownam);
+   
+	UNPROTECT(6);
+	//return ScalarReal(o);
+	return out;
+}
+
+//used to access/modify the numeric/double vector
+SEXP accessVector_rc_call(SEXP x)
+{
+	Rprintf("feng *call accessVec* in side c function\n");
+	//Getting the length
+	R_xlen_t n=xlength(x);
+		Rprintf("n is %d\n",n);
+	if(n==0)
+		return R_NilValue;
+	SEXP out = PROTECT(allocVector(REALSXP, n));
+	for(int i =0;i<n;i++)
+	{
+		REAL(out)[i]=REAL(x)[i]+2;
+	}
+	//double xc=asReal(x); double yc=asReal(y);
+	double* xi=REAL(x);
+	Rprintf("Printing using double pointer, %f :: %f :: %f\n", xi[0], xi[1], xi[2]); 
+	//for output
+	UNPROTECT(1);
+	return out;
 	
 }
 
+//used to access/modify the string vector
+SEXP accessStrVec_rc_call(SEXP x)
+{
+	Rprintf("feng *call access string vector * in side c function\n");
+	//Getting the length
+	R_xlen_t n=xlength(x);
+	Rprintf("n is %d\n",n);
+	if(n==0)
+		return R_NilValue;
+	SEXP out = PROTECT(allocVector(STRSXP, n));
+	for(int i =0;i<n;i++)
+	{
+		SET_STRING_ELT(out, i,(STRING_ELT(x, i)));
+		
+		Rprintf("the element %d: %s\n", i, CHAR((STRING_ELT(x, i))));
+	}
+	//double xc=asReal(x); double yc=asReal(y);
+	
+	//now let's see how we can access convert R string to C strings/char array
+	//char** x_ptr=STRING_PTR(x);
+	//Rprintf("testing the string pointer, STRING_PTR: first is %s === %s === %s ====\n", x_ptr[0],x_ptr[1],x_ptr[2]);
+	//for output
+	SET_STRING_ELT(x, 0, mkChar("ABS"));
+	UNPROTECT(1);
+	return out;
+	
+}
+
+
 //used to be called by .C() 
-//'Generate a subset of indices by full combination (C code)
+//'Generate a subset of indices by full combination (C code).
+//' an example of usage is that we have 10 indexes and we 
+//' we want to get 5 group of subset of these indexes each of which
+//' contains 3 indexes, starting pool A={1,2,3,....,10}
+//'  expecting output B={{1,2,3}, {1,2,4}, ....... , 
+//'       {2,3,4}, {2,3,5}......,
+//'  }
+//' So the parameter to this function in this case is 
+//'  x=10, y=3, z=[1:  C10_3]
 //'@param x integer total number of indexes
 //'@param y integer number of elements in the subset
-//'@param z integer number of subsets in the subset. The full set is calculate based on 
+//'@param z integer number of subsets in the subset to be output. The full set is calculate based on 
 //'	permutation without replacement and without order. If less than this number it will 
 //'	be truncated.
 //'@return interger matrix
@@ -171,7 +273,7 @@ struct diversity{
 	int length;
 };
 
-int sum_int_c(const int const * c, const int length)
+int sum_int_c(const int *const  c, const int length)
 {
 	int o=0;
 	for(int i=0;i<length;i++)
@@ -180,7 +282,7 @@ int sum_int_c(const int const * c, const int length)
 	}
 	return o;
 }
-double sum_double_c(const double const * c, const int length)
+double sum_double_c(const double * const  c, const int length)
 {
 	double o=0;
 	for(int i=0;i<length;i++)
@@ -189,7 +291,7 @@ double sum_double_c(const double const * c, const int length)
 	}
 	return o;
 }
-double* normalize_array_c(const int const * a, const int seqLen, const int sum, double* o)
+double* normalize_array_c(const int * const  a, const int seqLen, const int sum, double* o)
 {
 	//double* tmp=(double*) R_alloc(seqLen, sizeof(double));
 	for(int i=0;i<seqLen;i++)
@@ -199,7 +301,7 @@ double* normalize_array_c(const int const * a, const int seqLen, const int sum, 
 	return o;
 }
 //sum^2(a1-c(0.25,0.25,0.25,0.25)
-double array_diff_ss_c(const double const* a1)
+double array_diff_ss_c(const double * const a1)
 {
 	int length=4;
 	double tmp[]={0.25,0.25,0.25,0.25};
@@ -213,7 +315,7 @@ double array_diff_ss_c(const double const* a1)
 }
 
 //check to whether the integer array has zero elements in there
-bool hasZeros(const int const * freq, const int num)
+bool hasZeros(const int * const  freq, const int num)
 {
 	bool out=false;
 	for(int i =0;i<num; i++)
@@ -242,7 +344,7 @@ bool hasZeros(const int const * freq, const int num)
 //'		diverse and diverge score (diverging from perfect balanced )
  
 struct diversity* getDiversity(SEXP seq_matrix, const int numOfSeq, const int seqLength
-								, const int const * index, const int numOfIndex)
+								, const int * const  index, const int numOfIndex)
 							
 {
 	/*if(class(s)!="DNAStringSet")
@@ -338,7 +440,7 @@ struct diversity* getDiversity(SEXP seq_matrix, const int numOfSeq, const int se
 	//list(diverse=diverse, freq=diverge/len)
 	return sd;
 }
-bool isSeqsDiverse(const bool const* d, const int len )
+bool isSeqsDiverse(const bool * const d, const int len )
 {
 	//bool o=true;
 	Rprintf("len is %d\t", len);

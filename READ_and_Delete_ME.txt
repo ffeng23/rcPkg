@@ -36,7 +36,7 @@ mkdir src;
 #	to explain, the rcPkg is the name of the dll that will/is compile from the c code. 
 #			the add_rc is the function name of c code for the wrapper to call.
 #		#'@export
-#               #'@useDynLib rcPkg add_rc
+#      #'@useDynLib rcPkg add_rc
 #3) modify the NAMESPACE, with the following 
 
 #	export(add_r)
@@ -61,25 +61,35 @@ mkdir src;
 	#for windows 
 	R CMD SHLIB cDemo.c -o rcPkg.dll
 	#for linux
-	R CMD SHLIB cDemo.c -o rPkg.so 
+	R CMD SHLIB cDemo.c -o rcPkg.so 
    #one import thing is that we need to have the name of dll matched with the one in the R wrapper code.
+   
 setwd( "E:\\feng\\LAB\\hg\\Rccpp\\rcPkg") #for windows
-#setwd("/home/feng/Feng/hg/rcPkg") #for linux
+setwd("/home/feng/Feng/hg/rcPkg") #for linux
 devtools::document() #this will modify the NAMESPACE file
+
+   ######-------updated march 18 2020
+   ###it seems that we don't need to call to compile the dll explicitly. 
+   ##But in order to do re-compile we need to add the following code to the pkg. R module 
+   ### the .onUnload is called when we calling to do "document()". check the example code in this package.
+#   .onUnload <- function (libpath) {
+#		cat("calling to unload package lib...........\n")
+#		library.dynam.unload("rcPkg", libpath); #remember to modify this "rcPkg" to the correct package names.
+#	}
 
 #remove #<--------this is not necessary.
 remove.packages("rcPkg")
 #unload the dll in order to recompile the c code <--------now it seems this is not necessary.
-dyn.unload("E:\\feng\\LAB\\hg\\Rccpp\\rcPkg\\src\\rcPkg.dll")
+#dyn.unload("E:\\feng\\LAB\\hg\\Rccpp\\rcPkg\\src\\rcPkg.dll")
 #-----it seems that if need to reinstall/recompile everything, we need to restart the console. otherwise will fail to reinstall, even if we remove the package.
 
 #feng's directory to call to install
-setwd( "E:\\feng\\LAB\\hg\\Rccpp")
-dyn.unload("C:/Users/ff23/Documents/R/win-library/3.5/rcPkg/libs/x64/rcPkg.dll")
+#setwd( "E:\\feng\\LAB\\hg\\Rccpp")
+#dyn.unload("C:/Users/ff23/Documents/R/win-library/3.5/rcPkg/libs/x64/rcPkg.dll")
 #install from local directory, but this is different from install.packages
-setwd("/home/feng/Feng/hg")
-devtools::install("rcPkg")
-dyn.load("C:/Users/ff23/Documents/R/win-library/3.5/rcPkg/libs/x64/rcPkg.dll")
+#setwd("/home/feng/Feng/hg/rcPkg")
+devtools::install(".")
+#dyn.load("C:/Users/ff23/Documents/R/win-library/3.5/rcPkg/libs/x64/rcPkg.dll")
 library(rcPkg)
 
 #install from local using install.packages utility
@@ -95,3 +105,7 @@ dyn.load("C:/Users/ff23/Documents/R/win-library/3.5/rcPkg/libs/x64/rcPkg.dll")
 
 #load the package
 library(rcPkg)
+
+
+#R inline cfunctions need library 
+library(inline)

@@ -17,3 +17,9 @@
 ## usethis namespace: start
 ## usethis namespace: end
 NULL
+
+
+.onUnload <- function (libpath) {
+	cat("calling to unload package lib...........\n")
+  library.dynam.unload("rcPkg", libpath)
+}
