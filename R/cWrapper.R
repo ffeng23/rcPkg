@@ -99,9 +99,31 @@ getDiverseSet_w<-function(s,  index)
 #'	Data schema: [1] ReadID; [2] xVBase
 #'@param vlengths data frame the vlengths table
 #'	Data schema: [1] ReadID; [2] totalVBase 
+#'@param mCloneSize integer a minimum clone size that is used to filter out the smaller clones from the 
+#'	calculation 
 #'@param indel.penalty numeric the indel penalty score. The default is 1. 
 #'@return a data frame contains "sampleID" and "cloneID" and "idi" and "xMembers" (number of clone)
-#'	
+#'@examples 
+#'	# Please check the DataAnalysis_v1.2_intraClonalDiversit_nonSilentMu_cfun.R 
+#'	#for code examples.
+#'	#Basically we try to /must make sure the data frame to be correctly formatted 
+#'	#PLEASE DO NOT RUN
+#'	##start prepare the input for calling c intraClonalDiversities
+#'	##df.clone.test<-df.clones [,c("sampleName", "CloneID", "X.Members")]
+ #'	##df.cloneAssign.test<-df.cloneAssign[, c("sampleName", "CloneID", "ReadID")]
+#'	##df.mutations.test<-df.mutations[, c("ReadID", "Type", "Position")]
+#'	##IG.RecSum.test<-IG.RecSum[,c("UID", "X.VBases")]
+#'	##df.vlength.test<-df.vlength[, c("ReadID", "totalVBase", "XVBases")]; 	
+#'	##ready to call 
+#'	##system.time(
+#'	##	idis<-intraClonalDiversities(clones=df.clone.test, #clone summary, 
+#'	##			clone.assigns=df.cloneAssign.test, #clone assignments for sequences
+#'	##			mutations=df.mutations.test, #seq muations VRG
+#'	##			Ig.RecSums=IG.RecSum.test, #Ig Recsum for VBases
+#'	##			vlengths=df.vlength.test,  #total lengths of v 
+#'	##			indel.penalty=1 #for penalty of indel.
+#'	##			)
+#'	##	);
 #'@export
 #'@useDynLib rcPkg intraClonalDiversities_c
 
@@ -110,7 +132,8 @@ intraClonalDiversities<-function(
 			clone.assigns, #clone assignments for sequences
 			mutations, #seq muations VRG
 			Ig.RecSums, #Ig Recsum for VBases
-			vlengths,  #total lengths of v 
+			vlengths,  #total lengths of v
+            mCloneSize=3,			
 			indel.penalty=1 #for penalty of indel.
 )
 {
@@ -166,6 +189,7 @@ intraClonalDiversities<-function(
 					mutations_ReadID, mutations_Type, mutations_Position, 
 					Ig_RecSums_UID, Ig_RecSums_XVBase, 
 					vlengths_ReadID, vlengths_totalVBase,
+					mCloneSize,
 					indel.penalty
 			);
 }

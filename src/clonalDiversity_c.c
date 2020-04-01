@@ -2,6 +2,8 @@
 #define R
 #endif
 
+//#define DEBUG
+
 #include "helper_c.h"
 #include <stdio.h>
 #include <stdlib.h>
@@ -41,6 +43,7 @@ SEXP intraClonalDiversities_c(
 			SEXP vlengths_ReadID,  //total lengths of v, ReadID, char**  
 			SEXP vlengths_totalVBase, //         int*, totalVBase
 			
+			SEXP min_clone_size, //int, minimum clone size 
 			SEXP indel_penalty //for penalty of indel. a numeric scalar in R and double value in C
 		)
 	{
@@ -156,7 +159,7 @@ SEXP intraClonalDiversities_c(
 		size_t len_cloneAssigns_ReadID_sample;
 		
 		//start get larger clones 
-		int sizeOfClone=3;
+		int sizeOfClone=asInteger(min_clone_size);
 		size_t len_clone_large =getIndexOfElement(c_clones_xMembers, lenClones, sizeof(int), &sizeOfClone,
 											compareInt, clone_index_sample, 'g');  //here we only make use of th elen_clone_large but not clone_index_sample
 									//this is something to do in the future. move to do this large clone here. <----------TO DO.
@@ -209,13 +212,12 @@ SEXP intraClonalDiversities_c(
 		//size_t vlengths_totalVBase_k=0;//(size_t*)R_alloc(lenMutations, sizeof(size_t));
 		size_t len_vlengths_index_k=0;
 		//size_t len_vlengths_totalVBase_k=0;
-
-		
+	
 		size_t  j=0;
 		size_t index=0; //used doing counting of how mang total outputs
 		for(i =0;i<lenSampleNames;i++)  //looping through each samples
 		{
-			Rprintf("\t**doing sample %s......\n", unique_sampleNames[i]);
+			Rprintf("**doing sample %s..", unique_sampleNames[i]);
 			R_FlushConsole();
 			
 			//Get all the information for this sample, cloneIDs and xMembers,  cloneAssigns cloneID and readID, 
@@ -224,41 +226,57 @@ SEXP intraClonalDiversities_c(
 			//vlengths ReadID and xvbase (no sampleNmae, see above)
 			
 			//--first -- Get clone sample index with the name
+#ifdef DEBUG
 Rprintf(" before calling any showing lenClones:%d; c_clones_SampleNames: %s;\n", lenClones, c_clones_SampleNames[0]);			
+#endif
 			len_clone_index_sample =getIndexOfElement(c_clones_SampleNames, lenClones, sizeof(char*), unique_sampleNames+i,
 											compareStr, clone_index_sample,'e');
+#ifdef DEBUG
 			Rprintf("\t**doing 1.1......len_clone_index_sample:%d\n", len_clone_index_sample);
 			R_FlushConsole();
+#endif
 			//clone ID							
 			 len_clone_ID_sample=getElementByIndex(c_clone_cloneID, lenClones, sizeof(int),
 														clone_index_sample, len_clone_index_sample, clone_ID_sample);
+#ifdef DEBUG
 	Rprintf("\t**doing 1.2......len_clone_ID_sample:%d\n", len_clone_ID_sample);
 			R_FlushConsole();
+#endif 
 			 len_clone_xMembers_sample=getElementByIndex(c_clones_xMembers, lenClones, sizeof(int),
 														clone_index_sample, len_clone_index_sample, clone_xMembers_sample);
 			if(len_clone_ID_sample!=len_clone_index_sample||len_clone_xMembers_sample!=len_clone_index_sample)
 			{
 				Rprintf("********WARNING: the number of obtain records in clone table are not what we expect! Please check.......");
 			}		
+#ifdef DEBUG
 			Rprintf("\t**doing 2......len_clone_xMembers_sample:%d\n", len_clone_xMembers_sample);
 			R_FlushConsole();
+#endif
 			//----Second, do the cloneAssigns, sampleName, cloneID and readID			
 			 len_cloneAssigns_index_sample=getIndexOfElement(c_cloneAssigns_sampleNames, lenCloneAssigns, sizeof(char*), unique_sampleNames+i,
 											compareStr, cloneAssigns_index_sample, 'e');
+#ifdef DEBUG
 			Rprintf("\t**doing 2.0......len_cloneAssigns_index_sample:%d\n", len_cloneAssigns_index_sample);
+#endif
 			//now get sample specific cloneID and readID 
 			len_cloneAssigns_cloneID_sample=getElementByIndex(c_cloneAssigns_cloneID , lenCloneAssigns, sizeof(int),
 														cloneAssigns_index_sample, len_cloneAssigns_index_sample, cloneAssigns_cloneID_sample);
+#ifdef DEBUG
 			Rprintf("\t**doing 2.01......len_cloneAssigns_cloneID_sample:%d\n", len_cloneAssigns_cloneID_sample);
+#endif 
 			len_cloneAssigns_ReadID_sample=getElementByIndex(c_cloneAssigns_ReadID , lenCloneAssigns, sizeof(char**),
 														cloneAssigns_index_sample, len_cloneAssigns_index_sample, cloneAssigns_ReadID_sample);
+#ifdef DEBUG
 			Rprintf("\t**doing 2.02......len_cloneAssigns_ReadID_sample:%d\n", len_cloneAssigns_ReadID_sample);											
+#endif
 			if(len_cloneAssigns_cloneID_sample!=len_cloneAssigns_index_sample||len_cloneAssigns_ReadID_sample!=len_cloneAssigns_index_sample)
 			{
 				Rprintf("********WARNING: the number of obtain records in clone assign table are not what we expect! Please check.......");
 			}		
+#ifdef DEBUG
 			Rprintf("\t**doing 3......\n");
 			R_FlushConsole();
+#endif
 			//clones.sample<-clones[clones$sampleName==s,]
 			//clone.assigns.sample<-clone.assigns[clone.assigns$sampleName==s,]
 		   //	mutations.sample<-mutations[mutations$sampleName==s,]
@@ -269,8 +287,10 @@ Rprintf(" before calling any showing lenClones:%d; c_clones_SampleNames: %s;\n",
 			//int sizeOfClone=3;
 			size_t len_clone_index_sample_large =getIndexOfElement(clone_xMembers_sample, len_clone_index_sample, sizeof(int), &sizeOfClone,
 											compareInt, clone_index_sample, 'g');
+#ifdef DEBUG
 			Rprintf("\t**doing 3.1......len_clone_index_sample_large:%d\n", len_clone_index_sample_large);
 			R_FlushConsole();
+#endif
 			//clone ID
 			//clone_ID_sample=R_alloc(len_clone_index_sample, sizeof(int));	
 			int* clone_ID_sample_large= (int*)R_alloc(len_clone_index_sample_large, sizeof(int));
@@ -279,8 +299,10 @@ Rprintf(" before calling any showing lenClones:%d; c_clones_SampleNames: %s;\n",
 														clone_index_sample, len_clone_index_sample_large, clone_ID_sample_large);
 			len_clone_xMembers_sample =getElementByIndex(clone_xMembers_sample, len_clone_index_sample, sizeof(int),
 														clone_index_sample, len_clone_index_sample_large, clone_xMembers_sample_large);
+#ifdef DEBUG
 			Rprintf("\t**doing 3.2......len_clone_ID_sample(large):%d\n", len_clone_ID_sample);
 			R_FlushConsole();
+#endif
             if(len_clone_ID_sample!=len_clone_index_sample_large)
 			{
 				Rprintf("********WARNING: the number of obtain records in clone large data are not what we expect! Please check.......");
@@ -295,10 +317,12 @@ Rprintf(" before calling any showing lenClones:%d; c_clones_SampleNames: %s;\n",
 			//allocate the memory space for using in the loop j
 			char** cloneAssigns_ReadID_sample_j=(char**)R_alloc(len_cloneAssigns_ReadID_sample, sizeof(char*));
 			size_t * cloneAssigns_index_sample_j=(size_t*) R_alloc(len_cloneAssigns_ReadID_sample,sizeof(size_t));
+#ifdef DEBUG
 Rprintf("\t**doing 4......\n");
 			R_FlushConsole();
-			j=0;
-			
+#endif
+
+			j=0;			
 			for(j=0;j<len_clone_ID_sample;j++)  //looping through each cloneID within each sample
 			{
 				
@@ -307,19 +331,23 @@ Rprintf("\t**doing 4......\n");
 				
 				//Set up for output
 				SET_STRING_ELT(sn, index, mkChar(unique_sampleNames[i]));
-				Rprintf("\t**doing 4.2......clone_ID_j:%d: XMembers_j:%d.\n", clone_ID_sample_large[j], XMembers_j);
-			    
+#ifdef DEBUG
+				Rprintf("\t**doing 4.2......clone_ID_j:%d: XMembers_j:%d.\n", clone_ID_sample_large[j], XMembers_j);		    
 			R_FlushConsole();
+#endif				
 			INTEGER(cid)[index]=cloneID_j;
 //				SET_VECTOR_ELT(cid, index, ScalarInteger(cloneID_j));
+#ifdef DEBUG
 				Rprintf("\t**doing 4.3......cloneID_j\n");
 			R_FlushConsole();
+#endif
 			INTEGER(xm)[index]=XMembers_j;
 //				SET_VECTOR_ELT(xm, index, ScalarInteger(XMembers_j));
+#ifdef DEBUG
 				Rprintf("\t**doing 4.4......index:%d\n",index);
-			R_FlushConsole();
-			
+			R_FlushConsole();		
 			Rprintf("-----sn: %s;    cid : %d\n", CHAR(STRING_ELT(sn, index)), INTEGER(cid)[index]);
+#endif	
 				index++;
 				//cloneSize<-clones.sample[clones.sample$CloneID==j,"cloneSize"];
 				
@@ -328,11 +356,15 @@ Rprintf("\t**doing 4......\n");
 				size_t len_cloneAssigns_ReadID_sample_j=getIndexOfElement(cloneAssigns_cloneID_sample, len_cloneAssigns_cloneID_sample
 											, sizeof(int), &cloneID_j, compareInt, cloneAssigns_index_sample_j, 'e'
 												);
+#ifdef DEBUG
 				Rprintf("\t**doing 4.41......len_cloneAssigns_ReadID_sample_j: %d\n", len_cloneAssigns_ReadID_sample_j);
+#endif
 				size_t len_cloneAssigns_ReadID_sample_j_2=getElementByIndex(cloneAssigns_ReadID_sample, len_cloneAssigns_ReadID_sample,
 											sizeof(char*), cloneAssigns_index_sample_j, len_cloneAssigns_ReadID_sample_j, 
 											cloneAssigns_ReadID_sample_j);
+#ifdef DEBUG
 				Rprintf("\t**doing 4.4.2.....len_cloneAssigns_ReadID_sample_j2: %d\n", len_cloneAssigns_ReadID_sample_j_2);
+#endif
 				if(len_cloneAssigns_ReadID_sample_j!=len_cloneAssigns_ReadID_sample_j_2)
 				{
 					Rprintf("**********WARNING: the # of records return from sample and clone specific are not what we expected********\n");
@@ -397,11 +429,26 @@ Rprintf("\t**doing 4......\n");
 													&(seq[k].readID), compareStr, vlengths_index_k, 'e');
 					//len_Ig_RecSums_XVBase_k=getElementByIndex(Ig_RecSums_XVBase, lenRecSums, sizeof(size_t),
 					//								Ig_RecSums_index_k, len_Ig_RecSums_index_k, Ig_RecSums_XVBase_k);
-					if(len_vlengths_index_k!=1)
+					if(len_vlengths_index_k>1)
 					{
-						Rprintf("WARNING*****:more than one element selected for total VBase, only the first one will be used \n");
+						Rprintf("WARNING*****:more than one element selected for total VBase, only the first one will be used c: %zu ; k:%zu;cID :%zu, REAdID:%s\n"
+										, j, k, cloneID_j, cloneAssigns_ReadID_sample_j[k]);
+						seq[k].totalVBase=c_vlengths_totalVBase[vlengths_index_k[0]];
 					}
-					seq[k].totalVBase=c_vlengths_totalVBase[vlengths_index_k[0]];
+					else 
+					{
+							if(len_vlengths_index_k==0)  //now found ????
+							{
+								Rprintf("WARNING*****:no entry for total VBase, using the mapped length as the total length: %zu ; k:%zu;cID :%zu, REAdID:%s\n"
+										, j, k, cloneID_j, cloneAssigns_ReadID_sample_j[k]);
+								seq[k].totalVBase=c_Ig_RecSums_XVBase[Ig_RecSums_index_k[0]]; //using
+							}
+							else
+							{
+								seq[k].totalVBase=c_vlengths_totalVBase[vlengths_index_k[0]];
+							}
+					}
+					
 					
 					//clone.assigns.clone<-clone.assigns.sample[clone.assigns.sample$CloneID==j,];
 					//mutations.clone<-mutations.sample[is.element(mutations.sample$ReadID, clone.assigns.clone$ReadID),]
@@ -409,11 +456,14 @@ Rprintf("\t**doing 4......\n");
 					//vlengths.clone<-vlengths.sample[is.element(vlengths.sample$ReadID, clone.assigns.clone$ReadID),]
 				}//for loop for k READIDs 
 				double idi=0;
+#ifdef DEBUG
 				Rprintf("&&&&&&&&&&&DONE &&&&&&  idi :%f\n", idi);
+#endif
 					idi=		intraClonalDiversity(seq, len_cloneAssigns_ReadID_sample_j, indel_penalty_c
 							); //get idi for each clone
+#ifdef DEBUG
 				Rprintf("&&&&&&&&&&&DONE &&&&&&  idi :%f\n", idi);
-
+#endif
 					//here we need to store into the data frame , to do !!!
 //------> need to do this one 					idis[index,c(3,4,5)]  <-c(idi,XMembers,cloneSize )
 				REAL(ind)[index-1]=idi;
@@ -421,10 +471,13 @@ Rprintf("\t**doing 4......\n");
 			}//for loop clones 
 				//here store into the data frame 
 			//idis<-rbind(idis, idis.sample);
-			
+			Rprintf("Done\n");
+			R_FlushConsole();
 		}//end of outer for loop samples.
 		//
+#ifdef DEBUG
 		Rprintf("Done and set up the output .............");
+#endif
 		SET_VECTOR_ELT(idis, 0, sn);
 		SET_VECTOR_ELT(idis, 1, cid);
 		SET_VECTOR_ELT(idis, 2, ind);
@@ -438,14 +491,16 @@ Rprintf("\t**doing 4......\n");
 			SET_STRING_ELT(rownam, i, mkChar(s));
 		}
 		 setAttrib(idis, R_RowNamesSymbol, rownam);
+#ifdef DEBUG
 		if(index>1)		 	
 			Rprintf("--index:%zu---sn: %s;    cid : %d ;    idi: %f;     xMember: %d\n", index, CHAR(STRING_ELT(sn, 0)), INTEGER(cid)[0], REAL(ind)[0], INTEGER(xm)[0]);
-
+#endif
 		//write attributes of the data frame 
 		UNPROTECT(8);
 		return idis;
 	}//end of function.
 #endif
+
 //'Calculate the intra-clonal diversity for each clone.
 //'@param seq struct sequence array (pointer) holding the sequences for one clone in one sample. 
 //'			it contains the mutation information for sequence that will be used to calculate diversity.
@@ -475,7 +530,9 @@ double intraClonalDiversity( struct sequence * seq,
 				len_index_mutation_max=seq[i].numMu;
 			}
 		}
+#ifdef DEBUG
 		printf("the len_index_mutation_max:%zu\n", len_index_mutation_max);
+#endif
 		if(len_index_mutation_max==0) //all mutations are zero 
 		{
 			return (0);
@@ -519,16 +576,27 @@ double intraClonalDiversity( struct sequence * seq,
 #endif 
 		size_t temp=0;
 		size_t j=0;
+#ifdef DEBUG
 		printf("Ready to do the looping............\n");
+#endif
 		for(j=0;j<nmem-1;j++)
 		{ //1st one of the pair 
+			//Rprintf("j:%zu:\n",j);
 			for( i=j+1;i<nmem;i++)//starting from one, to make a pair.
 			{//2nd one of the pair
 				num_pair++;
+				//Rprintf("i:%zu.", i);
+				if(num_pair/500*500==num_pair){
+					Rprintf(".");
+					R_FlushConsole();
+					R_CheckUserInterrupt();
+				}
+#ifdef DEBUG
 				printf("doing the loop %zu........\n" , i );
 #ifdef R				
 				R_FlushConsole();
 #endif 
+#endif
 				/*num_pairs<-num_pairs+1;
 				mutation.seq1<-mutations[mutations$ReadID==id.seq1,c("Type", "Position")]
 				totalV.seq1<-vlengths[vlengths$ReadID==id.seq1,"totalVBase"];
@@ -545,9 +613,13 @@ double intraClonalDiversity( struct sequence * seq,
 				//mutation.seq2<-mutations[mutations$ReadID==id.seq2,c("Type", "Position")]
 				
 				num_nt=num_nt_seq2;
+#ifdef DEBUG
 				printf("\t the num_nt :%zu ; num_nt_seq1: %zu ; num_nt_seq2: %zu\n", num_nt, num_nt_seq1, num_nt_seq2);
+#endif
 				if(num_nt_seq2 > num_nt_seq1){
+#ifdef DEBUG
 					printf("\tConditions 1\n");
+#endif
 					num_nt=num_nt_seq1;
 					//pick the valid mutations based on their position
 					
@@ -572,7 +644,9 @@ double intraClonalDiversity( struct sequence * seq,
 					//#  num_nt.seq1 or num_nt.seq2 are the observed length, could be shorter.  (totalV.Seq- num_nt.seq1) telling us the unsequenced nts.
 					//# the mutation has to be falling into the sequenced region. 
 				}else {
+#ifdef DEBUG
 					printf("\tConditions 2\n");
+#endif
 					num_nt=num_nt_seq2;
 					//pick the valid mutations based on their position
 					temp=seq[i].totalVBase-seq[i].xVBase;
@@ -580,18 +654,22 @@ double intraClonalDiversity( struct sequence * seq,
 					{
 						temp=0;
 					}
+#ifdef DEBUG
 					 printf("based on the position :%zu; numMu: %zu\n", temp, seq[j].numMu);
-					size_t m=0;
+#endif
 					
+#ifdef DEBUG
+						size_t m=0;
 					for(m=0;m<seq[j].numMu;m++)
 					{
 						printf("m:%zu -- positions :%zu..........", m, seq[j].positions[m]);
 						fflush(stdout);
 					}
+#endif
 					len_index_mutation_seq1=getIndexOfElement(seq[j].positions, seq[j].numMu, sizeof(size_t),
 																	&temp, compareSizet, index_mutation_seq1, 'h');
 					
-					
+#ifdef DEBUG					
 					printf("len_index_mutation_seq1:%zu\n", len_index_mutation_seq1);
 						if(seq[j].numMu>0)
 						{
@@ -604,7 +682,7 @@ double intraClonalDiversity( struct sequence * seq,
 						}
 						printf("hello\n");
 						fflush(stdout);
-					
+#endif					
 					
 					//according to index, get elements 
 					num_nt_seq1=getElementByIndex(seq[j].positions, seq[j].numMu, sizeof(size_t), 
@@ -617,6 +695,7 @@ double intraClonalDiversity( struct sequence * seq,
 					memcpy(mutations_position_seq2_valid, seq[i].positions, sizeof(size_t)*num_nt_seq2);
 					memcpy(mutations_type_seq2_valid, seq[i].types, sizeof(char*)*num_nt_seq2);
 				}
+#ifdef DEBUG
 				if(seq[j].numMu>1)
 					printf("seq[i-1].numMu:%zu; seq[i-1].positions:%zu;seq.types:%s\n", seq[j].numMu, seq[j].positions[0], seq[j].types[0]); 
 				if(seq[i].numMu>1)
@@ -628,6 +707,7 @@ double intraClonalDiversity( struct sequence * seq,
 #ifdef R
 					R_FlushConsole();
 #endif
+#endif
 				//now count the different, seq[i-1] vs seq[i]
 				const char* mtype="Substitution";
 				len_index_mutation_seq1=getIndexOfElement(mutations_type_seq1_valid, num_nt_seq1, sizeof(char*),
@@ -636,6 +716,7 @@ double intraClonalDiversity( struct sequence * seq,
 				
 				size_t len_position_dif_seq1=getElementByIndex(mutations_position_seq1_valid,  num_nt_seq1, sizeof(size_t), 
 																	index_mutation_seq1, len_index_mutation_seq1, mutations_position_seq1_valid_diff);
+#ifdef DEBUG
 				printf("ready to move to next step 2\n");
 #ifdef C_CPP
 				fflush(stdout);
@@ -649,8 +730,11 @@ double intraClonalDiversity( struct sequence * seq,
 					printf("seq[i].numMu:%zu; seq[i].positions:%zu;seq.types:%s\n", num_nt_seq2, mutations_position_seq2_valid[0], mutations_type_seq2_valid[0]);
 					fflush(stdout);
 				}
+#endif
+
 				len_index_mutation_seq2=getIndexOfElement(mutations_type_seq2_valid, num_nt_seq2,sizeof(char*),
 																	&mtype, compareStr, index_mutation_seq2, 'e');
+#ifdef DEBUG
 				printf("ready to move to next step 2.5\n");
 #ifdef C_CPP
 				fflush(stdout);
@@ -658,9 +742,11 @@ double intraClonalDiversity( struct sequence * seq,
 #ifdef R
 					R_FlushConsole();
 #endif
+#endif
 				//get positions from seq2
 				size_t len_position_dif_seq2=getElementByIndex(mutations_position_seq2_valid,  num_nt_seq2, sizeof(size_t), 
 																	index_mutation_seq2, len_index_mutation_seq2, mutations_position_seq2_valid_diff);
+#ifdef DEBUG
 				printf("ready to move to next step 3\n");
 				if(seq[j].numMu>1)
 					printf("seq[i-1].numMu:%zu; seq[i-1].positions:%zu;seq.types:%s\n", seq[j].numMu, seq[j].positions[0], seq[j].types[0]);
@@ -681,22 +767,24 @@ double intraClonalDiversity( struct sequence * seq,
 				Rprintf("&&&&&&show: len_positions_dif_seq1:%zu;   len_position_dif_seq2: %zu\n", len_position_dif_seq1, len_position_dif_seq2);
 					R_FlushConsole();
 #endif
-
+#endif
 				double diff=setdiff_c(mutations_position_seq1_valid_diff, len_position_dif_seq1, 
 												mutations_position_seq2_valid_diff, len_position_dif_seq2, 
 												sizeof(size_t), compareSizet,
 												index_mutation_seq1 //note, this is just a holder that we are not going to using its value any way
 												);			
+#ifdef DEBUG
 #ifdef R
 				Rprintf("&&&&&&show: len_positions_dif_seq1:%zu;   len_position_dif_seq2: %zu\n", len_position_dif_seq1, len_position_dif_seq2);
 					R_FlushConsole();
 #endif
-
+#endif
 				diff+=setdiff_c(mutations_position_seq2_valid_diff, len_position_dif_seq2, 
 												mutations_position_seq1_valid_diff, len_position_dif_seq1,
 												sizeof(size_t), compareSizet,
 												index_mutation_seq1 //note, this is just a holder that we are not going to using its value any way
 												);
+#ifdef DEBUG
 				if(seq[j].numMu>1)
 					printf("*****seq[i-1].numMu:%zu; seq[i-1].positions:%zu;seq.types:%s\n", seq[j].numMu, seq[j].positions[0], seq[j].types[0]); 
 				if(seq[i].numMu>1)
@@ -707,6 +795,7 @@ double intraClonalDiversity( struct sequence * seq,
 #ifdef R
 					R_FlushConsole();
 #endif
+#endif
 				//*-------------------------------------------									
 				//--------********do indels**********
 				//**********************************
@@ -715,13 +804,17 @@ double intraClonalDiversity( struct sequence * seq,
 				//get positions from seq1 
 				len_position_dif_seq1=getElementByIndex(mutations_position_seq1_valid,  num_nt_seq1, sizeof(size_t), 
 																	index_mutation_seq1, len_index_mutation_seq1, mutations_position_seq1_valid_diff);
+#ifdef DEBUG
 				printf("ready to move to next step 2\n");
 				fflush(stdout);
+#endif
 				//Seq2
 				len_index_mutation_seq2=getIndexOfElement(mutations_type_seq2_valid, num_nt_seq2,sizeof(char*),
 																	&mtype, compareStr, index_mutation_seq2, 'n');
+#ifdef DEBUG
 				printf("ready to move to next step 2.5\n");
 				fflush(stdout);
+#endif
 				//get positions from seq2
 				len_position_dif_seq2=getElementByIndex(mutations_position_seq2_valid,  num_nt_seq2, sizeof(size_t), 
 																	index_mutation_seq2, len_index_mutation_seq2, mutations_position_seq2_valid_diff);
@@ -737,6 +830,7 @@ double intraClonalDiversity( struct sequence * seq,
 												sizeof(size_t), compareSizet,
 												index_mutation_seq1 //note, this is just a holder that we are not going to using its value any way
 												);		
+#ifdef DEBUG
 					if(seq[j].numMu>1)
 							printf("%%%%%%seq[i-1].numMu:%zu; seq[i-1].positions:%zu;seq.types:%s\n", seq[j].numMu, seq[j].positions[0], seq[j].types[0]); 
 					if(seq[i].numMu>1)
@@ -744,6 +838,7 @@ double intraClonalDiversity( struct sequence * seq,
 				fflush(stdout);
 				//num.diff.indel<- num.diff.indel*indel.penalty;
 				printf("diff:%f; num_nt:%zu\n", diff, num_nt);
+#endif
 				idi+=diff/num_nt;
 			}//end of loop through sequences/pairs
 		}
@@ -757,9 +852,11 @@ double intraClonalDiversity( struct sequence * seq,
 	free(mutations_type_seq1_valid);
 	free(mutations_type_seq2_valid);
 #endif		
+#ifdef DEBUG
 //		printf("seq[i-1].numMu:%zu; seq[i-1].positions:%zu;seq.types:%s\n", seq[0].numMu, seq[0].positions[0], seq[0].types[0]); 
 //			printf("seq[i].numMu:%zu; seq[i].positions:%zu;seq.types:%s\n", seq[1].numMu, seq[1].positions[0], seq[1].types[0]);
 		Rprintf("!!!!!!!!!!!!!!!!!!!!!1(IntraClonalDiversity) <->Done\n");
 			fflush(stdout);
+#endif
 		return idi/num_pair;
 	}//end of function 								
