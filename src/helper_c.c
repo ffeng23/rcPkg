@@ -25,6 +25,7 @@
 //				the element, assuming a SINGLE element to be compared with 
 //               
 //				compar, function pointer. the function we used to evaluted with.
+//              index , the pointer to the index array to which output will be written to .
 //             relation, relation between the element and member of array as a criteria to pick indexes.
 //									char, l(<), m(<=)e(=), g(>=),  h(>). , n (!=). For example, relation=e, meaning we will pick 
 //									the indexs of the array where the member of array equals to element; relation=l, 
@@ -45,7 +46,7 @@ size_t getIndexOfElement(const void* const p, const size_t nmem, const size_t si
 		update_flag=0; //no writing.
 		compare_result=compar((char*)p+i*size, element);
 		//compare each element to pick out the good ones
-		if(compare_result==0&&(relation=='e'||relation =='m'||relation=='h'))
+		if(compare_result==0&&(relation=='e'||relation =='m'||relation=='g'))
 		{
 			update_flag=1;
 		}

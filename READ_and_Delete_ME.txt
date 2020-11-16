@@ -61,7 +61,7 @@ mkdir src;
 	#for windows 
 	R CMD SHLIB cDemo.c -o rcPkg.dll
 	#for linux
-	R CMD SHLIB cDemo.c -o rcPkg.so 
+	R CMD SHLIB cDemo.c helper_c.c clonalDiversity.c -o rcPkg.so 
    #one import thing is that we need to have the name of dll matched with the one in the R wrapper code.
    
 setwd( "E:\\feng\\LAB\\hg\\Rccpp\\rcPkg") #for windows

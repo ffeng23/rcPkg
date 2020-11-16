@@ -18,7 +18,7 @@
 #endif
 
 #ifdef R 
-
+//updated 11/16/2020 to have disc section included for actual sequence length determination.
 //'it is outside caller's responsibility to make sure the parameters are passed in as correct type. (check for types)
 // return a matrix/vector holding the intraClonalDiversities for each sample  (paired list ???) 
 SEXP intraClonalDiversities_c(
@@ -42,7 +42,9 @@ SEXP intraClonalDiversities_c(
 			//now in vlengths table we don't include the sampleNames, since READID is good to identify
 			SEXP vlengths_ReadID,  //total lengths of v, ReadID, char**  
 			SEXP vlengths_totalVBase, //         int*, totalVBase
-			
+			SEXP vlengths_discPositionStart,  //int* discPositionStart 
+            SEXP vlengths_discPositionEnd,   //int* discPositionEnd
+            
 			SEXP min_clone_size, //int, minimum clone size 
 			SEXP indel_penalty //for penalty of indel. a numeric scalar in R and double value in C
 		)
@@ -127,6 +129,9 @@ SEXP intraClonalDiversities_c(
 		size_t lenVlengths=xlength(vlengths_ReadID);
 		const char**  c_vlengths_ReadID= (const char**)R_alloc(lenVlengths, sizeof(char*));   
 		int* c_vlengths_totalVBase=INTEGER(vlengths_totalVBase); 
+        int* c_vlengths_discPositionStart=INTEGER(vlengths_discPositionStart);
+        int* c_vlengths_discPositionEnd=INTEGER(vlengths_discPositionEnd);
+        
 		if(c_vlengths_ReadID==NULL) //failed???
 		{
 			Rprintf("error in allocating memories for Ig_RecSums data, please check for error");
@@ -287,8 +292,10 @@ Rprintf(" before calling any showing lenClones:%d; c_clones_SampleNames: %s;\n",
 			//int sizeOfClone=3;
 			size_t len_clone_index_sample_large =getIndexOfElement(clone_xMembers_sample, len_clone_index_sample, sizeof(int), &sizeOfClone,
 											compareInt, clone_index_sample, 'g');
+
 #ifdef DEBUG
 			Rprintf("\t**doing 3.1......len_clone_index_sample_large:%d\n", len_clone_index_sample_large);
+            Rprintf("\t**            ...clone_xMembers_sample [0]:%d\n",clone_xMembers_sample [0] );
 			R_FlushConsole();
 #endif
 			//clone ID
@@ -434,6 +441,8 @@ Rprintf("\t**doing 4......\n");
 						Rprintf("WARNING*****:more than one element selected for total VBase, only the first one will be used c: %zu ; k:%zu;cID :%zu, REAdID:%s\n"
 										, j, k, cloneID_j, cloneAssigns_ReadID_sample_j[k]);
 						seq[k].totalVBase=c_vlengths_totalVBase[vlengths_index_k[0]];
+                        seq[k].discPositionStart=c_vlengths_discPositionStart[vlengths_index_k[0]];
+                        seq[k].discPositionEnd=c_vlengths_discPositionEnd[vlengths_index_k[0]];
 					}
 					else 
 					{
@@ -442,10 +451,14 @@ Rprintf("\t**doing 4......\n");
 								Rprintf("WARNING*****:no entry for total VBase, using the mapped length as the total length: %zu ; k:%zu;cID :%zu, REAdID:%s\n"
 										, j, k, cloneID_j, cloneAssigns_ReadID_sample_j[k]);
 								seq[k].totalVBase=c_Ig_RecSums_XVBase[Ig_RecSums_index_k[0]]; //using
+                                seq[k].discPositionEnd=-1;
+                                seq[k].discPositionStart=-1;
 							}
 							else
 							{
 								seq[k].totalVBase=c_vlengths_totalVBase[vlengths_index_k[0]];
+                                seq[k].discPositionStart=c_vlengths_discPositionStart[vlengths_index_k[0]];
+                                seq[k].discPositionEnd=c_vlengths_discPositionEnd[vlengths_index_k[0]];
 							}
 					}
 					
@@ -504,11 +517,11 @@ Rprintf("\t**doing 4......\n");
 //'Calculate the intra-clonal diversity for each clone.
 //'@param seq struct sequence array (pointer) holding the sequences for one clone in one sample. 
 //'			it contains the mutation information for sequence that will be used to calculate diversity.
-//'@param nmem size_t number of sequences in the seq array
+//'@param nmem size_t number of sequences (members) in the seq array
 //'@param indel_penalty, score for the indels.
 //'@return a diversity  
 double intraClonalDiversity( struct sequence * seq, 
-														size_t nmem,  //# of sequenecs fo 
+														size_t nmem,  //# of sequenecs in this seq struct 
 														double indel_penalty   //penalty or score for indel
 							)
 	{
@@ -532,6 +545,7 @@ double intraClonalDiversity( struct sequence * seq,
 		}
 #ifdef DEBUG
 		printf("the len_index_mutation_max:%zu\n", len_index_mutation_max);
+        #Rprintf("the len_index_mutation_max:%zu\n", len_index_mutation_max);
 #endif
 		if(len_index_mutation_max==0) //all mutations are zero 
 		{
@@ -606,23 +620,96 @@ double intraClonalDiversity( struct sequence * seq,
 				#first total number of nts in the sequences
 				id.seq2<-clone.assignment[j,"ReadID"];*/
 				size_t num_nt, num_nt_seq1, num_nt_seq2;
+                size_t discPositionStart1, discPositionStart2, discPositionEnd1, discPositionEnd2;
+                
 				num_nt_seq1=seq[j].xVBase;
 				num_nt_seq2=seq[i].xVBase;
-				
+				discPositionStart1=seq[j].discPositionStart;
+                discPositionStart2=seq[i].discPositionStart;
+                discPositionEnd1=seq[j].discPositionEnd;
+                discPositionEnd2=seq[i].discPositionEnd;
+                
 				//totalV.seq2<-vlengths[vlengths$ReadID==id.seq2,"totalVBase"];
 				//mutation.seq2<-mutations[mutations$ReadID==id.seq2,c("Type", "Position")]
 				
+                //#now determine the valid mutations<--------
+                //#seq1
+                if((discPositionStart2!=-1)&&(discPositionEnd2!=-1))
+                {
+                    //mutation.seq1<-mutation.seq1[mutation.seq1$Position<discPositionStart.seq2|mutation.seq1$Position>discPositionEnd.seq2,]
+                    //first check for start poistion of discontinued section 
+                    
+                    //we need the mutation in seq1 is outside of disc section (<start | >end)
+                    size_t tmp_numMu1=getIndexOfElement(seq[j].positions, seq[j].numMu, sizeof(size_t),
+																	&(discPositionStart2), compareSizet, index_mutation_seq1, 'l');
+                    //get the second condition > end of disc section and append the output to the index_mutation_seq1
+                    tmp_numMu1+=getIndexOfElement(seq[j].positions, seq[j].numMu, sizeof(size_t),
+																	&(discPositionEnd2), compareSizet, index_mutation_seq1+tmp_numMu1, 'h');
+                    //get the element  based on the index
+                    tmp_numMu1=getElementByIndex(seq[j].positions, seq[j].numMu, sizeof(size_t), 
+																	index_mutation_seq1, tmp_numMu1, mutations_position_seq1_valid);
+                    tmp_numMu1=getElementByIndex(seq[j].types, seq[j].numMu, sizeof(char*), 
+																	index_mutation_seq1, tmp_numMu1, mutations_type_seq1_valid);
+                    
+                    seq[j].numMu=tmp_numMu1;
+					memcpy(seq[j].positions, mutations_position_seq1_valid,  sizeof(size_t)*seq[j].numMu);
+					memcpy(seq[j].types, mutations_type_seq1_valid,  sizeof(char*)*seq[j].numMu);
+                }
+                //#seq2, get rid of the mutations falling into the discontinued section 
+                if((discPositionStart1!=-1)&&(discPositionEnd1!=-1))
+                {
+                    //mutation.seq2<-mutation.seq2[mutation.seq2$Position<discPositionStart.seq1|mutation.seq2$Position>discPositionEnd.seq1,]
+                    //first check for start poistion of discontinued section 
+                    
+                    //we need the mutation in seq1 is outside of disc section (<start | >end)
+                    size_t tmp_numMu2=getIndexOfElement(seq[i].positions, seq[i].numMu, sizeof(size_t),
+																	&(discPositionStart1), compareSizet, index_mutation_seq2, 'l');
+                    //get the second condition > end of disc section and append the output to the index_mutation_seq1
+                    tmp_numMu2+=getIndexOfElement(seq[i].positions, seq[i].numMu, sizeof(size_t),
+																	&(discPositionEnd1), compareSizet, index_mutation_seq2+tmp_numMu2, 'h');
+                    
+                    //get the element  based on the index
+                    tmp_numMu2=getElementByIndex(seq[i].positions, seq[i].numMu, sizeof(size_t), 
+																	index_mutation_seq2, tmp_numMu2, mutations_position_seq2_valid);
+                    tmp_numMu2=getElementByIndex(seq[i].types, seq[i].numMu, sizeof(char*), 
+																	index_mutation_seq2, tmp_numMu2, mutations_type_seq2_valid);
+                    //copy back to the seq struct 
+                    seq[i].numMu=tmp_numMu2;
+					memcpy(seq[i].positions, mutations_position_seq2_valid,  sizeof(size_t)*seq[i].numMu);
+					memcpy(seq[i].types, mutations_type_seq2_valid,  sizeof(char*)*seq[i].numMu);
+                }
+                
+                //now we start checking the conditions to determine the actual length of the "combined" sequence
+                //we also want to get the valid mutation arrays of both sequences and get them ready for checking diff  
 				num_nt=num_nt_seq2;
 #ifdef DEBUG
 				printf("\t the num_nt :%zu ; num_nt_seq1: %zu ; num_nt_seq2: %zu\n", num_nt, num_nt_seq1, num_nt_seq2);
 #endif
-				if(num_nt_seq2 > num_nt_seq1){
+				if(num_nt_seq2 > num_nt_seq1){  //this is the case where seq1 is shorter !!!
 #ifdef DEBUG
 					printf("\tConditions 1\n");
 #endif
 					num_nt=num_nt_seq1;
+                    
+                    if(discPositionStart1!=-1&&(discPositionEnd1!=-1)) //#<----
+                    {
+                        num_nt=getSeqLength_disc1_existShort (
+                                num_nt_seq1,
+                                seq[j].totalVBase,
+                                discPositionStart1,
+                                discPositionEnd1,
+                                discPositionStart2,
+                                discPositionEnd2
+                            );
+                    }else{ //#seq1 doesn't has disc section 
+                          num_nt=getSeqLength_disc1_NAShort(
+                                    num_nt_seq1,
+                                    seq[j].totalVBase,
+                                    discPositionStart2,
+                                    discPositionEnd2
+                                );
+                    }
 					//pick the valid mutations based on their position
-					
 					temp=seq[j].totalVBase-seq[j].xVBase;
 					if(seq[j].totalVBase<seq[j].xVBase)
 					{
@@ -648,6 +735,26 @@ double intraClonalDiversity( struct sequence * seq,
 					printf("\tConditions 2\n");
 #endif
 					num_nt=num_nt_seq2;
+                    //get actual num_nt 
+                    if((discPositionStart2!=-1)&&(discPositionEnd2!=-1)) //#<----
+                    {
+                        num_nt=getSeqLength_disc1_existShort (
+                                num_nt_seq2,
+                                seq[i].totalVBase,
+                                discPositionStart2,
+                                discPositionEnd2,
+                                discPositionStart1,
+                                discPositionEnd1
+                            );
+                        
+                    } else { //# seq2 disc is not present
+                        num_nt=getSeqLength_disc1_NAShort(
+                                    num_nt_seq2,
+                                    seq[i].totalVBase,
+                                    discPositionStart1,
+                                    discPositionEnd1
+                                );
+                    }
 					//pick the valid mutations based on their position
 					temp=seq[i].totalVBase-seq[i].xVBase;
 					if(seq[i].totalVBase<seq[i].xVBase)
@@ -860,3 +967,162 @@ double intraClonalDiversity( struct sequence * seq,
 #endif
 		return idi/num_pair;
 	}//end of function 								
+    
+ //   
+    size_t getSeqLength_inclusive_seq1Disc_ahead (
+        size_t seqLength,
+        size_t discPositionStart1,
+        size_t discPositionEnd1,
+        size_t discPositionStart2,
+        size_t discPositionEnd2
+    )
+    {
+      if(discPositionStart1==-1||discPositionStart2==-1||discPositionEnd1==-1||discPositionEnd2==-1)
+        {
+            error("one or both sequence discontinued section is not present. quit!!!\n");
+            return -1;//R_NilValue;
+        }
+        if(discPositionStart1>discPositionStart2)
+        {
+            error("the seq 1 discontinued section starts after seq2 one. quit!!");
+            return -1;//R_NilValue;
+        }
+//#NOTE: again assume discPositionStart1<discPositionStart2
+        size_t mg_discPositionStart=discPositionStart1;//real start ; set default 
+        size_t mg_discPositionEnd=discPositionEnd1;//read end ; set default
+        size_t num_nt=seqLength;//#mg_discPositionStart-mg_discPositionEnd;# the real final length; set default 
+        if(discPositionEnd1<discPositionEnd2)
+        {
+            if(discPositionEnd1<discPositionStart2){
+                    //#two disc sections don't cross, we need to subtract both
+                    num_nt=seqLength-(mg_discPositionEnd-mg_discPositionStart+1);//#default seq1 first
+                    //#seq2
+                    mg_discPositionStart=discPositionStart2;
+                    mg_discPositionEnd=discPositionEnd2;
+                    num_nt=num_nt-(mg_discPositionEnd-mg_discPositionStart+1);
+            }else //#both cross , since seq1 disc ends after seq2 starts.
+            {
+                mg_discPositionStart=discPositionStart1;
+                    mg_discPositionEnd=discPositionEnd2;  
+                    num_nt=seqLength-(mg_discPositionEnd-mg_discPositionStart+1);
+            }
+        }
+        else  //#in this case, seq1 end after seq2 disc end, seq1 include seq2 
+        {
+            //#using the default setting (of seq1 disc )
+            num_nt=seqLength-(mg_discPositionEnd-mg_discPositionStart+1);
+        }
+        //#mg_discPositionStart<-discPositionStart.seq2
+        return num_nt;  
+    }
+
+//this is the one to calculate the actual sequence length with the seq 1 discontinued section present 
+//see detail in frLib  getSeqLength_disc1_existShort R code for details
+//this function deal with the condition where the seq1 discontinued section exists, but the seq2 disc section might or might not exists
+//most times seq1 total length and seq2 total length are the same.
+// we also assume seq1 is the shorter sequence between the two. 
+// do NOT assume discPosition 1 is ahead of discPosition2
+//
+//Assume discPositionStart and discPositionEnd to be -1 if they are not available.
+size_t    getSeqLength_disc1_existShort(
+        size_t seqLength,
+        size_t totalLength,
+        size_t discPositionStart1,
+        size_t discPositionEnd1,
+        size_t discPositionStart2,
+        size_t discPositionEnd2
+    )
+  {
+        if(discPositionStart1==-1|| discPositionStart1==-1)
+        {
+            error("seq1 discontinued section is not present!!! quit!!!\n");
+            return (-1);
+        }
+        //#ASSUME disc seq1 exist and it is short than seq2
+        //#so we don't have to check the whether seq1 disc exist
+        //#set up the default 
+        
+        size_t mg_discPositionStart=discPositionStart1;
+        size_t mg_discPositionEnd=discPositionEnd1;
+        size_t num_nt=seqLength - (mg_discPositionEnd-mg_discPositionStart+1) ;
+                        
+        //#check the longer one disc positions, in case the short sequence start within the 
+        //#longer sequence discontinue section
+        if(  discPositionStart2!=-1 )  //#case where seq2 disc exists 
+        {
+            //#first check the location of seq1 start and seq2 disc section starts
+            // #the first case is seq1 starts after seq2 disc section starts
+            if( (totalLength - seqLength) > discPositionStart2){  //# note the seq1 and seq2 are all right aligned and they must have identical CDR3
+                        if((totalLength - seqLength)<discPositionEnd2)
+                        { //#staring of seq1 is falling into disc section of seq2. so we need to reset seq2 disc section starting position 
+                                discPositionStart2 = totalLength - seqLength;
+                                //#after resetting the starting point, we can not call the function do the job
+                                //#prepare the input 
+                                
+                                num_nt=getSeqLength_inclusive_seq1Disc_ahead (//#note: in this case seq2 disc is ahead of seq1 disc, so we swap the position and feed int the params 
+                                            seqLength, discPositionStart2, discPositionEnd2, 
+                                            discPositionStart1, discPositionEnd1
+                                        );
+                        }else {
+                            //# starting of seq1 is not include disc section , this is same as if there is no disc section on seq2 and we only need to look at seq1 
+                            //# so we do noghting in here. since originally above it is check seq1 alone.
+                            //#use the default setting the seq1 disc section boundaries
+                            num_nt=seqLength-(mg_discPositionEnd-mg_discPositionStart+1);
+                        }
+                
+            } else //#meaning (totalLength - num.seq1)<=discPositionStart.seq2)  in this case we have disc seq1 and disc seq2 exist and they all well are included in the shorter seq 
+            {
+                //#now we need to check to see which one is ahead of the other to determine the order of 
+                //#calling 
+                if(discPositionStart1<discPositionStart2){
+                    num_nt=getSeqLength_inclusive_seq1Disc_ahead ( //#<=== function call need to filling detail
+                            seqLength, discPositionStart1, discPositionEnd1,
+                                            discPositionStart2, discPositionEnd2
+                        );
+                }else { //# this is the one disc seq2 is ahead
+                     num_nt=getSeqLength_inclusive_seq1Disc_ahead (//#note: in this case seq2 disc is ahead of seq1 disc, so we swap the position and feed int the params 
+                                            seqLength, discPositionStart2, discPositionEnd2, 
+                                            discPositionStart1, discPositionEnd1
+                                        );                    
+                }
+                    
+            }
+        }   else   { //#in this condition, no disc section in seq2
+            //# we do nothing, since the originally above it is set up to consider only the seq1
+            //        #jusing the default setting seq1 boundaries
+            //        #use the default setting the seq1 disc section boundaries
+                    num_nt=seqLength-(mg_discPositionEnd-mg_discPositionStart+1);
+             
+        }//#end of if else first level
+        
+        return num_nt;
+} //#end of function
+
+size_t getSeqLength_disc1_NAShort(
+      size_t  seqLength,
+      size_t  totalLength,
+      size_t  discPositionStart2,
+      size_t  discPositionEnd2
+    )
+ {
+       size_t num_nt=seqLength;
+    if(discPositionStart2!=-1){
+        if((totalLength-seqLength)<discPositionStart2){
+            //#here the shorter seq1 is before seq2 discountinue section starts
+                num_nt=seqLength-(discPositionEnd2-discPositionStart2+1);
+        } else {// # here the shoter seq1 is after seq2 discontinue section starts 
+            if((totalLength-seqLength)<discPositionEnd2){ //# shorter seq1 starts in the middle of discontinued section 
+                    discPositionStart2=totalLength-seqLength;
+                    num_nt=seqLength-(discPositionEnd2-discPositionStart2+1);
+            } else { //# the shorter seq1 is after seq2 discontinued section ends 
+                //#so there is no discontinued section 
+                num_nt=seqLength;
+            }
+        }
+    }
+    else {//#both seq2 discontinued and seq1 discontinued section are not present .
+        num_nt=seqLength; //#do nothing.
+    }
+    return num_nt ; 
+}
+        

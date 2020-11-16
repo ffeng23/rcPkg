@@ -1,4 +1,7 @@
 #R wrapper for c code
+#updates: intraClonalDiversities_w is changed from intraClonalDiversities, since now we r code with the same name.
+#       this one is wrapper to call c code to speed calculation.
+#   11/16/2020
 
 #'@export
 #'@useDynLib rcPkg add_rc
@@ -11,6 +14,8 @@ add_r_w<-function(x,y)
 # list of pointers. so we get the output as the 3rd input.
 	.C(add_rc, x, y, numeric(1))[[3]];
 }
+#the following unlink the library when recompile and has been moved to 
+#    the module "rcPkg-package.R"
 #only apply to pakcages with name spaces.
 #.onUnload <- function (libpath) {
 #	cat("***********doing unloading\t")
@@ -85,6 +90,9 @@ getDiverseSet_w<-function(s,  index)
 			);
 }
 
+#updates: intraClonalDiversities_w is changed from intraClonalDiversities, since now we r code with the same name.
+#       this one is wrapper to call c code to speed calculation.
+#   11/16/2020
 #now define a wrapper to call intraDiversities
 #'@title R wrapper of c functions to do intraDiversities
 #'@description doing c code based on the input to calculate the intraDiversities of clones for each sample
@@ -98,7 +106,7 @@ getDiverseSet_w<-function(s,  index)
 #'@param Ig.RecSums data frame the Ig recombination table 
 #'	Data schema: [1] ReadID; [2] xVBase
 #'@param vlengths data frame the vlengths table
-#'	Data schema: [1] ReadID; [2] totalVBase 
+#'	Data schema: [1] ReadID; [2] totalVBase ;[3] discontinued position start; [4] discontinued position end 
 #'@param mCloneSize integer a minimum clone size that is used to filter out the smaller clones from the 
 #'	calculation 
 #'@param indel.penalty numeric the indel penalty score. The default is 1. 
@@ -113,7 +121,7 @@ getDiverseSet_w<-function(s,  index)
  #'	##df.cloneAssign.test<-df.cloneAssign[, c("sampleName", "CloneID", "ReadID")]
 #'	##df.mutations.test<-df.mutations[, c("ReadID", "Type", "Position")]
 #'	##IG.RecSum.test<-IG.RecSum[,c("UID", "X.VBases")]
-#'	##df.vlength.test<-df.vlength[, c("ReadID", "totalVBase", "XVBases")]; 	
+#'	##df.vlength.test<-df.vlength[, c("ReadID", "totalVBase", "discPosStart", "discPosEnd")]; 	
 #'	##ready to call 
 #'	##system.time(
 #'	##	idis<-intraClonalDiversities(clones=df.clone.test, #clone summary, 
@@ -127,7 +135,7 @@ getDiverseSet_w<-function(s,  index)
 #'@export
 #'@useDynLib rcPkg intraClonalDiversities_c
 
-intraClonalDiversities<-function(
+intraClonalDiversities_w<-function(
 			clones, #clone summary, 
 			clone.assigns, #clone assignments for sequences
 			mutations, #seq muations VRG
@@ -180,15 +188,22 @@ intraClonalDiversities<-function(
 		#	//now in vlengths table we don't include the sampleNames, since READID is good to identify
 		vlengths_ReadID=as.character(vlengths[,1])#,  //total lengths of v, ReadID, char**  
 		vlengths_totalVBase=as.integer(vlengths[,2]);# //         int*, totalVBase
-			
-		
+        #cat("vlengths_ReadD turned characters:", vlengths_ReadID, "\n")
+        #prepare the discPositions; convert NA is 
+        vlengths[is.na(vlengths[,3]),3]=-1;
+        vlengths[is.na(vlengths[,4]),4]=-1;
+		vlengths_discPositionStart=as.integer(vlengths[,3]);
+        vlengths_discPositionEnd=as.integer(vlengths[,4]);	
+		#cat("ready to call ....\n")
+        #cat(colnames(vlengths), "\n")
+        #cat(as.character(vlengths[,1]), "\n")
 	.Call(
 		intraClonalDiversities_c, 
 					clones_sampleNames, clones_cloneID, clones_xMembers,
 					cloneAssigns_sampleNames, cloneAssigns_cloneID, cloneAssigns_ReadID, 
 					mutations_ReadID, mutations_Type, mutations_Position, 
 					Ig_RecSums_UID, Ig_RecSums_XVBase, 
-					vlengths_ReadID, vlengths_totalVBase,
+					vlengths_ReadID, vlengths_totalVBase, vlengths_discPositionStart, vlengths_discPositionEnd,
 					mCloneSize,
 					indel.penalty
 			);

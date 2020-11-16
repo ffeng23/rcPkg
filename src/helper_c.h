@@ -3,7 +3,7 @@
 
 #include <stddef.h>
 //'in here we define the headers for helper c functions, that might be called by other c functions
-//' note these are not going to be called R (?)
+//' note these are not going to be called by directly R (?)
 //'call to do set difference following R style (? setdiff in R to see the description)
 //' asymetric difference  
 //' passing in two arrays
