@@ -427,8 +427,10 @@ Rprintf("\t**doing 4......\n");
 					//								Ig_RecSums_index_k, len_Ig_RecSums_index_k, Ig_RecSums_XVBase_k);
 					if(len_Ig_RecSums_index_k!=1)
 					{
-						Rprintf("WARNING*****:more than one element selected for XVBase, only the first one will be used \n");
-					}
+						Rprintf("WARNING*****:more than one element selected for XVBase, only the first one will be used. length: %zu \n", len_Ig_RecSums_index_k);
+                        Rprintf("the UID : %s; \n",seq[k].readID);
+                    }
+                    //return R_NilValue;
 					seq[k].xVBase=c_Ig_RecSums_XVBase[Ig_RecSums_index_k[0]];
 					
 					//now do the total vBase
@@ -448,8 +450,8 @@ Rprintf("\t**doing 4......\n");
 					{
 							if(len_vlengths_index_k==0)  //now found ????
 							{
-								Rprintf("WARNING*****:no entry for total VBase, using the mapped length as the total length: %zu ; k:%zu;cID :%zu, REAdID:%s\n"
-										, j, k, cloneID_j, cloneAssigns_ReadID_sample_j[k]);
+								Rprintf("WARNING*****:no entry for total VBase, using the mapped length as the total length:j -- %zu ; k:%zu;cID :%zu, REAdID:%s; xVBase length:%zu\n"
+										, j, k, cloneID_j, cloneAssigns_ReadID_sample_j[k], c_Ig_RecSums_XVBase[Ig_RecSums_index_k[0]]);
 								seq[k].totalVBase=c_Ig_RecSums_XVBase[Ig_RecSums_index_k[0]]; //using
                                 seq[k].discPositionEnd=-1;
                                 seq[k].discPositionStart=-1;
